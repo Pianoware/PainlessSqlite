@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>$id$</id>
-    <version>$version$</version>
+    <version>$version$-alpha</version>
     <title>Painless Sqlite</title>
     <authors>$author$</authors>
     <!--<owners>$author$</owners>-->

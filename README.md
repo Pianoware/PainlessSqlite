@@ -4,6 +4,12 @@ Better than barebones SQLite, but not quite Entity Framework either.
 
 This is **Painless Sqlite**, for those who think that one's too bare, and that other one's too hairy! 
 
+## Install
+
+[Add Nuget Package](https://www.nuget.org/packages/Pianoware.PainlessSqlite/)
+
+`PM> Install-Package Pianoware.PainlessSqlite -Pre`
+
 ## Usage
 Inherit from `SqliteContext` and add fields and/or properties of type `SqliteSet<TModel>` where `TModel` is your model type:
 
