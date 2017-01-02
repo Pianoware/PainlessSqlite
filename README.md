@@ -1,6 +1,6 @@
 ## Painless Sqlite
 
-Better than barebones SQLite, but not quite Entity Framework either.
+Better than barebones SQLite, but not quite Entity Framework.
 
 This is **Painless Sqlite**, for those who think that one's too bare, and that other one's too hairy! 
 
