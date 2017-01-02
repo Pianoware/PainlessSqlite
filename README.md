@@ -4,6 +4,7 @@ Better than barebones SQLite, but not quite Entity Framework either... This is *
 
 ## Usage
 Inherit from SqliteContext and add fields and/or properties of type `SqliteSet<TModel>` where TModel is your model type:
+
 `class MyContext : SqliteContext 
 {
   SqliteSet<Employee> Employees;
