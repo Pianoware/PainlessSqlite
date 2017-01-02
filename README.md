@@ -5,7 +5,7 @@ Better than barebones SQLite, but not quite Entity Framework either.
 This is **Painess Sqlite**, for those who think that one's too bare, and that other one's too hairy! 
 
 ## Usage
-Inherit from SqliteContext and add fields and/or properties of type `SqliteSet<TModel>` where `TModel` is your model type:
+Inherit from `SqliteContext` and add fields and/or properties of type `SqliteSet<TModel>` where `TModel` is your model type:
 
 ```C#
 class MyContext : SqliteContext 
