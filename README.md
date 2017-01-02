@@ -6,7 +6,7 @@ This is **Painless Sqlite**, for those who think that one's too bare, and that o
 
 ## Install
 
-[Add Nuget Package](https://www.nuget.org/packages/Pianoware.PainlessSqlite/)
+Add Nuget Package [Pianoware.PainlessSqlite](https://www.nuget.org/packages/Pianoware.PainlessSqlite/) (Pre-release)
 
 `PM> Install-Package Pianoware.PainlessSqlite -Pre`
 
