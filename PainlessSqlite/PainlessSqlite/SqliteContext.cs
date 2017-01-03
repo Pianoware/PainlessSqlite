@@ -57,7 +57,7 @@ namespace Pianoware.PainlessSqlite
 			foreach (var setInfo in contextInfo.Sets)
 			{
 				// Initialize sets
-				var setInstance = setInfo.Create(connection, setInfo.TableInfo);
+				var setInstance = setInfo.Create(connection, setInfo.TableInfo.Name);
 				setInfo.SetMember.SetValue(this, setInstance);
 			}
 		}

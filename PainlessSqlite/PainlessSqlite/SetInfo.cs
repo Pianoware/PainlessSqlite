@@ -1,4 +1,6 @@
-﻿using System.Linq;
+﻿using System;
+using System.Data.SQLite;
+using System.Linq;
 using System.Reflection;
 
 namespace Pianoware.PainlessSqlite
@@ -12,7 +14,7 @@ namespace Pianoware.PainlessSqlite
 		internal SetInfo(VariableInfo setMember)
 		{
 			this.SetMember = setMember;
-			this.constructorInfo = setMember.VariableType.GetConstructors(BindingFlags.NonPublic | BindingFlags.Instance)[0];
+			this.constructorInfo = setMember.VariableType.GetConstructor(BindingFlags.NonPublic | BindingFlags.Instance, null, new Type[] { typeof(SQLiteConnection), typeof(string) }, null);
 			this.TableInfo = new TableInfo
 			{
 				Name = setMember.Name,
