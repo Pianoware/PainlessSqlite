@@ -7,28 +7,30 @@ using Dapper;
 using SQLinq;
 using SQLinq.Dapper;
 using System.Linq.Expressions;
+using System.Reflection;
 
 namespace Pianoware.PainlessSqlite
 {
+
 	// Similar to DbSet
 	public sealed class SqliteSet<TModel>: IEnumerable<TModel> where TModel : new()
 	{
 		SQLiteConnection connection;
+		SqlinqOperation[] sqlinqOperations;
 		string tableName; 
-		SQLinq<TModel> sqlinq;
+		//SQLinq<TModel> sqlinq;
 
 		// Hold on to the connection and model info
 		SqliteSet (SQLiteConnection connection, string tableName) 
-			: this(connection, tableName, null)
-		{
-		}
+			: this(connection, tableName, new SqlinqOperation[0]) { }
 
 		// Sqlinq integration
-		SqliteSet (SQLiteConnection connection, string tableName, SQLinq<TModel> sqlinq)
+		SqliteSet (SQLiteConnection connection, string tableName, SqlinqOperation[] sqlinqOperations)
 		{
 			this.connection = connection;
 			this.tableName = tableName;
-			this.sqlinq = sqlinq ?? new SQLinq<TModel>(tableName);
+			//this.sqlinq = sqlinq ?? new SQLinq<TModel>(tableName);
+			this.sqlinqOperations = sqlinqOperations;
 		}
 
 		// Add
@@ -65,6 +67,15 @@ namespace Pianoware.PainlessSqlite
 		// Implementation for IEnumerable 
 		public IEnumerator<TModel> GetEnumerator()
 		{
+			// Instantiate sqlinq
+			var sqlinq = new SQLinq<TModel>(tableName);
+
+			// Run all operations
+			foreach (var operation in sqlinqOperations)
+			{
+				operation.Run(sqlinq);
+			}
+
 			return connection.Query(sqlinq).GetEnumerator();
 		}
 
@@ -76,35 +87,83 @@ namespace Pianoware.PainlessSqlite
 
 		// SQLinq operations
 		public SqliteSet<TModel> Distinct(bool distinct = true) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.Distinct(distinct));
+			AppendOperation("Distinct", distinct);
 
 		public SqliteSet<TModel> OrderBy(Expression<Func<TModel, object>> keySelector) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.OrderBy(keySelector));
+			AppendOperation("OrderBy", keySelector);
 
 		public SqliteSet<TModel> OrderByDescending(Expression<Func<TModel, object>> keySelector) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.OrderByDescending(keySelector));
+			AppendOperation("OrderByDescending", keySelector);
 
 		public SqliteSet<TModel> Skip(int skip) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.Skip(skip));
+			AppendOperation("Skip", skip);
 
 		public SqliteSet<TModel> Take(int take) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.Take(take));
+			AppendOperation("Take", take);
 
 		public SqliteSet<TModel> ThenBy(Expression<Func<TModel, object>> keySelector) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.ThenBy(keySelector));
+			AppendOperation("ThenBy", keySelector);
 
 		public SqliteSet<TModel> ThenByDescending(Expression<Func<TModel, object>> keySelector) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.ThenByDescending(keySelector));
+			AppendOperation("ThenByDescending", keySelector);
 
 		public SqliteSet<TModel> Where(Expression expression) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.Where(expression));
+			AppendOperation("Where1", expression);
 
 		public SqliteSet<TModel> Where(Expression<Func<TModel, bool>> expression) =>
-			new SqliteSet<TModel>(connection, tableName, sqlinq.Where(expression));
+			AppendOperation("Where2", expression);
+
+		SqliteSet<TModel> AppendOperation(string method, params object[] parameters)
+		{
+			return new SqliteSet<TModel>(connection, tableName,
+				sqlinqOperations.Union(new[] { new SqlinqOperation(method, parameters) }).ToArray());
+		}
+
+		class SqlinqOperation
+		{
+			static Dictionary<string, MethodInfo> methods = new Dictionary<string, MethodInfo>
+			{
+				{ "Distinct", typeof(SQLinq<TModel>).GetMethod("Distinct") },
+				{ "OrderBy", typeof(SQLinq<TModel>).GetMethod("OrderBy") },
+				{ "OrderByDescending", typeof(SQLinq<TModel>).GetMethod("OrderByDescending") },
+				{ "Skip", typeof(SQLinq<TModel>).GetMethod("Skip") },
+				{ "Take", typeof(SQLinq<TModel>).GetMethod("Take") },
+				{ "ThenBy", typeof(SQLinq<TModel>).GetMethod("ThenBy") },
+				{ "ThenByDescending", typeof(SQLinq<TModel>).GetMethod("ThenByDescending") },
+				{ "Where1", typeof(SQLinq<TModel>).GetMethod("Where", new[] { typeof(Expression<Func<TModel, bool>>) }) },
+				{ "Where2", typeof(SQLinq<TModel>).GetMethod("Where", new[] {typeof(Expression) }) }
+			};
+
+			MethodInfo Method { get; }
+			object[] Parameters { get; }
+
+			public SqlinqOperation(string method, params object[] parameters)
+			{
+				this.Method = methods[method];
+				this.Parameters = parameters;
+			}
+
+			public void Run(SQLinq<TModel> sqlinq)
+			{
+				Method.Invoke(sqlinq, Parameters);
+			}
+		}
 
 
 		public override string ToString()
 		{
+			// Todo: Deduplicate
+
+			// Instantiate sqlinq
+			var sqlinq = new SQLinq<TModel>(tableName);
+
+			// Run all operations
+			foreach (var operation in sqlinqOperations)
+			{
+				operation.Run(sqlinq);
+			}
+
+			// Get query text
 			return sqlinq.ToSQL().ToQuery();
 		}
 	}
