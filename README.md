@@ -1,4 +1,6 @@
-## Painless Sqlite
+# Painless Sqlite
+
+![Painless Sqlite](https://raw.githubusercontent.com/Pianoware/PainlessSqlite/master/Graphics/logo-white-64.png "Painless Sqlite")
 
 Better than barebones SQLite, but not quite Entity Framework.
 
