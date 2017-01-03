@@ -50,4 +50,4 @@ using (var myContext = new MyContext())
 
 ## Support or Contact
 
-Fellas, this is provided for your convenience and pleasure and inspiration. If you have any questions or suggestions, email me at arash.motamedi@gmail.com. Contributions that keep with the spirit of the library - lightweight and straightforward - will be greatly appreciated. 
+This library is provided for your convenience and pleasure and inspiration. If you have any questions or suggestions, email me at arash.motamedi@gmail.com. Contributions that keep with the spirit of the library - lightweight and straightforward - will be greatly appreciated. 
