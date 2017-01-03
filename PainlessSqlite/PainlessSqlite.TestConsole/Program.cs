@@ -13,7 +13,7 @@ namespace PainlessSqlite.TestConsole
 	{
 		static void Main(string[] args)
 		{
-			Console.WriteLine(test((DateTime d) => d < DateTime.Now));
+			// Console.WriteLine(test((DateTime d) => d < DateTime.Now));
 
 			using (var context = new MyContext())
 			{
@@ -21,25 +21,37 @@ namespace PainlessSqlite.TestConsole
 				{
 					Name = "Arash Motamedi",
 					EmployeeType = EmployeeType.Contractor,
-					//Address = new Address
-					//{
-					//	Street = "901 8th St",
-					//	City = "Seattle",
-					//	ZipCode = 98104
-					//}
 				};
-				var id = context.Employees.Add(employee).Id;
-				var employees = context.Employees.Where(e => e.Id > 0).OrderBy(e => e.Name);
-				foreach (var emp in employees)
+
+				context.Employees.Add(employee);
+				context.Employees.Add(employee);
+				context.Employees.Add(employee);
+
+				var e = context.Employees.Where(f => f.Name == "Arash Motamedi");
+				foreach (var item in e)
 				{
-					Console.WriteLine(JsonConvert.SerializeObject(emp, Formatting.Indented));
+					Console.WriteLine(JsonConvert.SerializeObject(item));
 				}
+
+				e = context.Employees.Where(f => f.Id > 1 && f.Name.EndsWith("edi"));
+				foreach (var item in e)
+				{
+					Console.WriteLine(JsonConvert.SerializeObject(item));
+				}
+
+				e = e.Where(f => f.Name.StartsWith("Arash")).OrderByDescending(f => f.Id);
+				foreach (var item in e)
+				{
+					Console.WriteLine(JsonConvert.SerializeObject(item));
+				}
+
+
 			}
 
 			Console.ReadLine();
 		}
 
-		static string test<T> (Expression<Predicate<T>> pred)
+		static string test<T>(Expression<Predicate<T>> pred)
 		{
 			return pred.Body.ToString();
 		}
