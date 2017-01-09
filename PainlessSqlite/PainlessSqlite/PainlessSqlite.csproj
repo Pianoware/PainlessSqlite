@@ -32,15 +32,6 @@
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
   <ItemGroup>
-    <Reference Include="Dapper, Version=1.50.2.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\Dapper.1.50.2\lib\net451\Dapper.dll</HintPath>
-    </Reference>
-    <Reference Include="SQLinq, Version=2.0.0.0, Culture=neutral, PublicKeyToken=1c5d57eb9e11fe4b, processorArchitecture=MSIL">
-      <HintPath>..\packages\SQLinq.2.0\lib\net\SQLinq.dll</HintPath>
-    </Reference>
-    <Reference Include="SQLinq.Dapper, Version=1.2.0.0, Culture=neutral, processorArchitecture=MSIL">
-      <HintPath>..\packages\SQLinq.Dapper.1.2\lib\net\SQLinq.Dapper.dll</HintPath>
-    </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />
     <Reference Include="System.Data.SQLite, Version=1.0.104.0, Culture=neutral, PublicKeyToken=db937bc2d44ff139, processorArchitecture=MSIL">
@@ -60,6 +51,7 @@
     <Compile Include="DatabaseHelper.cs" />
     <Compile Include="DatabaseId.cs" />
     <Compile Include="DatabaseInfo.cs" />
+    <Compile Include="ModelProxy.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
     <Compile Include="SetInfo.cs" />
     <Compile Include="SqliteContext.cs" />
@@ -68,6 +60,7 @@
     <Compile Include="TableInfo.cs" />
     <Compile Include="TypeExtensions.cs" />
     <Compile Include="VariableInfo.cs" />
+    <Compile Include="WhereQueryBuilder.cs" />
   </ItemGroup>
   <ItemGroup>
     <None Include="packages.config" />

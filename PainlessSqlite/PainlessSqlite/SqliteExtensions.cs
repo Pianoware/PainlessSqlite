@@ -9,7 +9,7 @@ namespace Pianoware.PainlessSqlite
 	public static class SqliteExtensions
 	{
 		// Basic types use simple conversion
-		static Type[] basicTypes = new[] { typeof(string), typeof(int) };
+		static Type[] basicTypes = { typeof(string), typeof(int) };
 
 		// Instantiate and populate object from reader
 		static object CreateObject(Type type, SQLiteDataReader reader)

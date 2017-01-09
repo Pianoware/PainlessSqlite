@@ -3,41 +3,36 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Data.SQLite;
 using System.Linq;
-using Dapper;
-using SQLinq;
-using SQLinq.Dapper;
 using System.Linq.Expressions;
 using System.Reflection;
+using System.Text;
 
 namespace Pianoware.PainlessSqlite
 {
 
 	// Similar to DbSet
-	public sealed class SqliteSet<TModel>: IEnumerable<TModel> where TModel : new()
+	public sealed class SqliteSet<TModel> : IEnumerable<TModel> where TModel : new()
 	{
 		SQLiteConnection connection;
-		SqlinqOperation[] sqlinqOperations;
-		string tableName; 
-		//SQLinq<TModel> sqlinq;
+		QueryOperations queryOperations;
+		string tableName;
 
 		// Hold on to the connection and model info
-		SqliteSet (SQLiteConnection connection, string tableName) 
-			: this(connection, tableName, new SqlinqOperation[0]) { }
+		SqliteSet(SQLiteConnection connection, string tableName)
+			: this(connection, tableName, new QueryOperations()) { }
 
 		// Sqlinq integration
-		SqliteSet (SQLiteConnection connection, string tableName, SqlinqOperation[] sqlinqOperations)
+		SqliteSet(SQLiteConnection connection, string tableName, QueryOperations queryOperations)
 		{
 			this.connection = connection;
 			this.tableName = tableName;
-			//this.sqlinq = sqlinq ?? new SQLinq<TModel>(tableName);
-			this.sqlinqOperations = sqlinqOperations;
+			this.queryOperations = queryOperations;
 		}
 
 		// Add
 		public TModel Add(TModel obj)
 		{
 			var variables = typeof(TModel).GetVariables().Where(v => !string.Equals("Id", v.Name, StringComparison.OrdinalIgnoreCase));
-			// Todo parameterize
 			var command = new SQLiteCommand($"INSERT INTO \"{tableName}\" ({string.Join(",", variables.Select(v => $"\"{v.Name}\""))}) VALUES ({string.Join(",", variables.Select(v => $"@{v.Name}"))})", connection);
 			command.Parameters.AddRange(variables.Select(v => new SQLiteParameter { ParameterName = v.Name, Value = v.GetValue(obj) }).ToArray());
 			long newId;
@@ -64,19 +59,44 @@ namespace Pianoware.PainlessSqlite
 			return obj;
 		}
 
+		// Update 
+		public void Update(TModel obj)
+		{
+			if (typeof(TModel).GetVariable("Id") == null)
+				throw new Exception($"Model {typeof(TModel).Name} doest not contain an Id variable and cannot be updated or deleted");
+
+			var variables = typeof(TModel).GetVariables().Where(v => !string.Equals("Id", v.Name, StringComparison.OrdinalIgnoreCase));
+			long id = (long)typeof(TModel).GetVariable("Id").GetValue(obj);
+
+			var command = new SQLiteCommand($"UPDATE \"{tableName}\" SET {string.Join(",", variables.Select(v => $"\"{v.Name}\" = @{v.Name}"))} WHERE Id = {id}", connection);
+			command.Parameters.AddRange(variables.Select(v => new SQLiteParameter { ParameterName = v.Name, Value = v.GetValue(obj) }).ToArray());
+			command.ExecuteNonQuery();
+		}
+
+		// Delete
+		public void Delete(TModel obj)
+		{
+			if (typeof(TModel).GetVariable("Id") == null)
+				throw new Exception($"Model {typeof(TModel).Name} doest not contain an Id variable and cannot be updated or deleted");
+
+			var variables = typeof(TModel).GetVariables().Where(v => !string.Equals("Id", v.Name, StringComparison.OrdinalIgnoreCase));
+			long id = (long)typeof(TModel).GetVariable("Id").GetValue(obj);
+
+			var command = new SQLiteCommand($"DELETE FROM \"{tableName}\" WHERE Id = {id}", connection);
+			command.ExecuteNonQuery();
+		}
+
 		// Implementation for IEnumerable 
 		public IEnumerator<TModel> GetEnumerator()
 		{
-			// Instantiate sqlinq
-			var sqlinq = new SQLinq<TModel>(tableName);
+			var command = new SQLiteCommand(connection);
+			var query = queryOperations.GetQuery(tableName);
+			command.CommandText = query.QueryText;
 
-			// Run all operations
-			foreach (var operation in sqlinqOperations)
-			{
-				operation.Run(sqlinq);
-			}
+			if (query.Parameters?.Length > 0)
+				command.Parameters.AddRange(query.Parameters);
 
-			return connection.Query(sqlinq).GetEnumerator();
+			return command.ExecuteQuery<TModel>().GetEnumerator();
 		}
 
 		IEnumerator IEnumerable.GetEnumerator()
@@ -85,86 +105,184 @@ namespace Pianoware.PainlessSqlite
 		}
 
 
-		// SQLinq operations
+		// Selection operations
 		public SqliteSet<TModel> Distinct(bool distinct = true) =>
-			AppendOperation("Distinct", distinct);
-
-		public SqliteSet<TModel> OrderBy(Expression<Func<TModel, object>> keySelector) =>
-			AppendOperation("OrderBy", keySelector);
-
-		public SqliteSet<TModel> OrderByDescending(Expression<Func<TModel, object>> keySelector) =>
-			AppendOperation("OrderByDescending", keySelector);
-
-		public SqliteSet<TModel> Skip(int skip) =>
-			AppendOperation("Skip", skip);
-
-		public SqliteSet<TModel> Take(int take) =>
-			AppendOperation("Take", take);
-
-		public SqliteSet<TModel> ThenBy(Expression<Func<TModel, object>> keySelector) =>
-			AppendOperation("ThenBy", keySelector);
-
-		public SqliteSet<TModel> ThenByDescending(Expression<Func<TModel, object>> keySelector) =>
-			AppendOperation("ThenByDescending", keySelector);
-
-		public SqliteSet<TModel> Where(Expression expression) =>
-			AppendOperation("Where1", expression);
+			AppendOperation(queryOperations.SetDistinct(distinct));
 
 		public SqliteSet<TModel> Where(Expression<Func<TModel, bool>> expression) =>
-			AppendOperation("Where2", expression);
+			AppendOperation(queryOperations.SetWhere(expression));
 
-		SqliteSet<TModel> AppendOperation(string method, params object[] parameters)
+		public SqliteSet<TModel> OrderBy(Expression<Func<TModel, object>> keySelector) =>
+			OrderBy(keySelector, ascending: true);
+
+		public SqliteSet<TModel> OrderByDescending(Expression<Func<TModel, object>> keySelector) =>
+			OrderBy(keySelector, ascending: false);
+
+		public SqliteSet<TModel> ThenBy(Expression<Func<TModel, object>> keySelector) =>
+			OrderBy(keySelector, ascending: true);
+
+		public SqliteSet<TModel> ThenByDescending(Expression<Func<TModel, object>> keySelector) =>
+			OrderBy(keySelector, ascending: false);
+
+		public SqliteSet<TModel> Skip(int skip) =>
+			AppendOperation(queryOperations.SetSkip(skip));
+
+		public SqliteSet<TModel> Take(int take) =>
+			AppendOperation(queryOperations.SetTake(take));
+
+
+		SqliteSet<TModel> OrderBy(Expression<Func<TModel, object>> keySelector, bool ascending)
 		{
-			return new SqliteSet<TModel>(connection, tableName,
-				sqlinqOperations.Union(new[] { new SqlinqOperation(method, parameters) }).ToArray());
-		}
-
-		class SqlinqOperation
-		{
-			static Dictionary<string, MethodInfo> methods = new Dictionary<string, MethodInfo>
+			var lambdaExpression = keySelector as LambdaExpression;
+			MemberExpression lambdaBody = null;
+			if (lambdaExpression.Body.NodeType == ExpressionType.Convert)
 			{
-				{ "Distinct", typeof(SQLinq<TModel>).GetMethod("Distinct") },
-				{ "OrderBy", typeof(SQLinq<TModel>).GetMethod("OrderBy") },
-				{ "OrderByDescending", typeof(SQLinq<TModel>).GetMethod("OrderByDescending") },
-				{ "Skip", typeof(SQLinq<TModel>).GetMethod("Skip") },
-				{ "Take", typeof(SQLinq<TModel>).GetMethod("Take") },
-				{ "ThenBy", typeof(SQLinq<TModel>).GetMethod("ThenBy") },
-				{ "ThenByDescending", typeof(SQLinq<TModel>).GetMethod("ThenByDescending") },
-				{ "Where1", typeof(SQLinq<TModel>).GetMethod("Where", new[] { typeof(Expression<Func<TModel, bool>>) }) },
-				{ "Where2", typeof(SQLinq<TModel>).GetMethod("Where", new[] {typeof(Expression) }) }
-			};
-
-			MethodInfo Method { get; }
-			object[] Parameters { get; }
-
-			public SqlinqOperation(string method, params object[] parameters)
+				var convertExpression = lambdaExpression.Body as UnaryExpression;
+				lambdaBody = convertExpression.Operand as MemberExpression;
+			}
+			else
 			{
-				this.Method = methods[method];
-				this.Parameters = parameters;
+				lambdaBody = lambdaExpression?.Body as MemberExpression;
 			}
 
-			public void Run(SQLinq<TModel> sqlinq)
+			if (lambdaBody != null && (lambdaBody.Member is FieldInfo || lambdaBody.Member is PropertyInfo))
+				return AppendOperation(queryOperations.AddOrderBy(new OrderBySegment { Column = lambdaBody.Member.Name, Ascending = ascending }));
+
+			throw new Exception("Not a valid field or property expression: " + keySelector);
+		}
+
+		SqliteSet<TModel> AppendOperation(QueryOperations newQueryOperations)
+		{
+			return new SqliteSet<TModel>(connection, tableName, newQueryOperations);
+		}
+
+		class QueryOperations
+		{
+			public bool Distinct { get; private set; }
+			public int? Skip { get; private set; }
+			public int? Take { get; private set; }
+			public Expression Where { get; private set; }
+			public OrderBySegment[] OrderBy { get; private set; }
+
+			public QueryOperations SetDistinct(bool distinct) =>
+				new QueryOperations(this) { Distinct = distinct };
+
+			public QueryOperations SetSkip(int? skip) =>
+				new QueryOperations(this) { Skip = skip };
+
+			public QueryOperations SetTake(int? take) =>
+				new QueryOperations(this) { Take = take };
+
+			public QueryOperations SetWhere(Expression where)
 			{
-				Method.Invoke(sqlinq, Parameters);
+				// One where clause per query
+				if (Where != null)
+					throw new Exception("Where clause already specified");
+
+				var newQueryOperations = new QueryOperations(this);
+				newQueryOperations.Where = where;
+				return newQueryOperations;
+			}
+
+			public QueryOperations AddOrderBy(OrderBySegment orderBy)
+			{
+				var newQueryOperations = new QueryOperations(this);
+				if (OrderBy?.Length > 0)
+				{
+					if (OrderBy.Any(o => o.Column == orderBy.Column))
+						throw new Exception("Duplicate order for column " + orderBy.Column);
+					newQueryOperations.OrderBy = OrderBy.Union(new OrderBySegment[] { orderBy }).ToArray();
+				}
+				else
+					newQueryOperations.OrderBy = new OrderBySegment[] { orderBy };
+
+				return newQueryOperations;
+			}
+
+			// Public constructor
+			public QueryOperations()
+			{ }
+
+			QueryOperations(QueryOperations source)
+			{
+				Distinct = source.Distinct;
+				Where = source.Where;
+				OrderBy = source.OrderBy;
+				Skip = source.Skip;
+				Take = source.Take;
+			}
+
+			public Query GetQuery(string tableName)
+			{
+				var result = new Query();
+
+				// Projection
+				var queryBuilder = new StringBuilder("SELECT ");
+				if (Distinct)
+					queryBuilder.Append("DISTINCT ");
+
+				queryBuilder.Append("* FROM \"");
+				queryBuilder.Append(tableName);
+				queryBuilder.Append("\" ");
+
+				// Where
+				if (Where != null)
+				{
+					var whereBuilder = new WhereQueryBuilder();
+					var whereQuery = whereBuilder.BuildWhereQuery(Where as LambdaExpression);
+					result.Parameters = whereQuery.Parameters.Select(p => new SQLiteParameter(p.Name, p.Value)).ToArray();
+					queryBuilder.Append("WHERE (");
+					queryBuilder.Append(whereQuery.Query);
+					queryBuilder.Append(") ");
+				}
+
+				// Order by
+				if (OrderBy?.Length > 0)
+				{
+					queryBuilder.Append("ORDER BY ");
+					queryBuilder.Append(string.Join(", ", OrderBy.Select(o => $"\"{o.Column}\" " + (o.Ascending ? "ASC" : "DESC"))));
+					queryBuilder.Append(" ");
+				}
+
+				// Skip (offset)
+				if (Skip.HasValue)
+				{
+					queryBuilder.Append("OFFSET ");
+					queryBuilder.Append(Skip.Value);
+				}
+
+				// Take (limit)
+				if (Take.HasValue)
+				{
+					queryBuilder.Append("LIMIT ");
+					queryBuilder.Append(Take.Value);
+				}
+
+				result.QueryText = queryBuilder.ToString();
+				return result;
+			}
+
+			public override string ToString()
+			{
+				return base.ToString();
 			}
 		}
 
+		class OrderBySegment
+		{
+			public bool Ascending = true;
+			public string Column;
+		}
+
+		class Query
+		{
+			public string QueryText;
+			public SQLiteParameter[] Parameters;
+		}
 
 		public override string ToString()
 		{
-			// Todo: Deduplicate
-
-			// Instantiate sqlinq
-			var sqlinq = new SQLinq<TModel>(tableName);
-
-			// Run all operations
-			foreach (var operation in sqlinqOperations)
-			{
-				operation.Run(sqlinq);
-			}
-
-			// Get query text
-			return sqlinq.ToSQL().ToQuery();
+			return queryOperations.GetQuery(tableName).QueryText;
 		}
 	}
 }
