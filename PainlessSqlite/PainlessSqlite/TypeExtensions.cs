@@ -30,9 +30,11 @@ namespace Pianoware.PainlessSqlite
 			return variables;
 		}
 
-		internal static VariableInfo GetVariable(this Type type, string name)
+		internal static VariableInfo GetVariable(this Type type, string name, bool ignoreCase = false)
 		{
-			return type.GetVariables().Where(v => v.Name == name).SingleOrDefault();
+			return type.GetVariables()
+				.Where(v => string.Equals(v.Name, name, comparisonType: ignoreCase ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal))
+				.SingleOrDefault();
 		}
 	}
 }

@@ -13,9 +13,23 @@ namespace Pianoware.PainlessSqlite
 	// Similar to DbSet
 	public sealed class SqliteSet<TModel> : IEnumerable<TModel> where TModel : new()
 	{
-		SQLiteConnection connection;
-		QueryOperations queryOperations;
-		string tableName;
+		readonly SQLiteConnection connection;
+		readonly QueryOperations queryOperations;
+		readonly string tableName;
+
+		#pragma warning disable RECS0108 // Warns about static fields in generic types
+		// These are static fields specific to each generic definition, not a mistake
+		static readonly VariableInfo idVariable;
+		static readonly VariableInfo[] dataVariables;
+		#pragma warning restore RECS0108 // Warns about static fields in generic types
+
+		// Static constructor
+		static SqliteSet() {
+			var type = typeof(TModel);
+			var variables = type.GetVariables();
+			idVariable = type.GetVariable("Id", true);
+			dataVariables = variables.Where(v => v != idVariable).ToArray();
+		}
 
 		// Hold on to the connection and model info
 		SqliteSet(SQLiteConnection connection, string tableName)
@@ -32,13 +46,11 @@ namespace Pianoware.PainlessSqlite
 		// Add
 		public TModel Add(TModel obj)
 		{
-			var variables = typeof(TModel).GetVariables().Where(v => !string.Equals("Id", v.Name, StringComparison.OrdinalIgnoreCase));
-			var command = new SQLiteCommand($"INSERT INTO \"{tableName}\" ({string.Join(",", variables.Select(v => $"\"{v.Name}\""))}) VALUES ({string.Join(",", variables.Select(v => $"@{v.Name}"))})", connection);
-			command.Parameters.AddRange(variables.Select(v => new SQLiteParameter { ParameterName = v.Name, Value = v.GetValue(obj) }).ToArray());
+			var command = new SQLiteCommand($"INSERT INTO \"{tableName}\" ({string.Join(",", dataVariables.Select(v => $"\"{v.Name}\""))}) VALUES ({string.Join(",", dataVariables.Select(v => $"@{v.Name}"))})", connection);
+			command.Parameters.AddRange(dataVariables.Select(v => new SQLiteParameter { ParameterName = v.Name, Value = v.GetValue(obj) }).ToArray());
 			long newId;
 
 			// To get last rowid, lock on connection
-			var idVariable = typeof(TModel).GetVariable("Id");
 			if (idVariable != null)
 			{
 				// Only lock on connection if Model contains an Id variable
@@ -62,26 +74,23 @@ namespace Pianoware.PainlessSqlite
 		// Update 
 		public void Update(TModel obj)
 		{
-			if (typeof(TModel).GetVariable("Id") == null)
-				throw new Exception($"Model {typeof(TModel).Name} doest not contain an Id variable and cannot be updated or deleted");
+			if (idVariable == null)
+				throw new Exception($"Model does not contain an Id variable and cannot be updated or deleted");
 
-			var variables = typeof(TModel).GetVariables().Where(v => !string.Equals("Id", v.Name, StringComparison.OrdinalIgnoreCase));
-			long id = (long)typeof(TModel).GetVariable("Id").GetValue(obj);
+			long id = (long)idVariable.GetValue(obj);
 
-			var command = new SQLiteCommand($"UPDATE \"{tableName}\" SET {string.Join(",", variables.Select(v => $"\"{v.Name}\" = @{v.Name}"))} WHERE Id = {id}", connection);
-			command.Parameters.AddRange(variables.Select(v => new SQLiteParameter { ParameterName = v.Name, Value = v.GetValue(obj) }).ToArray());
+			var command = new SQLiteCommand($"UPDATE \"{tableName}\" SET {string.Join(",", dataVariables.Select(v => $"\"{v.Name}\" = @{v.Name}"))} WHERE Id = {id}", connection);
+			command.Parameters.AddRange(dataVariables.Select(v => new SQLiteParameter { ParameterName = v.Name, Value = v.GetValue(obj) }).ToArray());
 			command.ExecuteNonQuery();
 		}
 
 		// Delete
 		public void Delete(TModel obj)
 		{
-			if (typeof(TModel).GetVariable("Id") == null)
-				throw new Exception($"Model {typeof(TModel).Name} doest not contain an Id variable and cannot be updated or deleted");
+			if (idVariable == null)
+				throw new Exception($"Model does not contain an Id variable and cannot be updated or deleted");
 
-			var variables = typeof(TModel).GetVariables().Where(v => !string.Equals("Id", v.Name, StringComparison.OrdinalIgnoreCase));
-			long id = (long)typeof(TModel).GetVariable("Id").GetValue(obj);
-
+			long id = (long)idVariable.GetValue(obj);
 			var command = new SQLiteCommand($"DELETE FROM \"{tableName}\" WHERE Id = {id}", connection);
 			command.ExecuteNonQuery();
 		}
@@ -130,7 +139,7 @@ namespace Pianoware.PainlessSqlite
 		public SqliteSet<TModel> Take(int take) =>
 			AppendOperation(queryOperations.SetTake(take));
 
-
+		// Order by function
 		SqliteSet<TModel> OrderBy(Expression<Func<TModel, object>> keySelector, bool ascending)
 		{
 			var lambdaExpression = keySelector as LambdaExpression;
@@ -151,6 +160,7 @@ namespace Pianoware.PainlessSqlite
 			throw new Exception("Not a valid field or property expression: " + keySelector);
 		}
 
+		// Append query operation
 		SqliteSet<TModel> AppendOperation(QueryOperations newQueryOperations)
 		{
 			return new SqliteSet<TModel>(connection, tableName, newQueryOperations);
