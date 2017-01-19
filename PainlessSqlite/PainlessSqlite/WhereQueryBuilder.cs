@@ -242,9 +242,8 @@ namespace Pianoware.PainlessSqlite
 				case ExpressionType.Convert:
 					{
 						var convertExpression = expression as UnaryExpression;
-						if (convertExpression.IsLiftedToNull)
-							return GetQuery(convertExpression.Operand, parameter, parameters);
-
+						// if (convertExpression.IsLiftedToNull)
+						return GetQuery(convertExpression.Operand, parameter, parameters);
 						break;
 					}
 

@@ -13,6 +13,19 @@ namespace ProxyModelTest
 	{
 		static void Main(string[] args)
 		{
+			using (var context = new Context("Data Source=:memory:"))
+			{
+				context.Models.Add(new Model { Enum = ModelEnum.Enum2 });
+				foreach (var model in context.Models.Where(m => m.Enum != ModelEnum.Enum3))
+				{
+					Console.WriteLine(model.Enum.ToString());
+				}
+
+				Console.ReadLine();
+				return;
+			}
+
+
 			var iterations = 1000;
 			var t1 = DateTime.Now;
 			using (var context = new Context("Data Source=" + Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "db.sqlite")))
@@ -68,6 +81,12 @@ namespace ProxyModelTest
 		public long Id;
 		public string Name;
 		public DateTime Date;
+		public ModelEnum Enum;
+	}
+
+	enum ModelEnum
+	{
+		Enum1, Enum2, Enum3
 	}
 
 }
